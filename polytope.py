@@ -46,7 +46,9 @@ class MassPolygon(SizePolygon):
         self.apply_force(self.mass*g) # TODO check that vector math expansion will work here
 
 class PolygonGroup(Polygon, PolytopeGroup):
-    pass
+    def __init__(self, *polys):
+        super().__init__()
+        self._polys = list(polys)
 
 # === SHAPES ==
 

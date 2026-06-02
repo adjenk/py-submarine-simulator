@@ -50,41 +50,53 @@ class Propeller(Polygon):
 
         return xf, yf, zf
 
+    def draw(self, surface):
+        pg.draw.circle(surface, (255, 0, 0), (int(self.s.x)+400 - 80, int(self.s.z)+300), 5)
+
 class Hull(ResistantCylinder, VisualPolygon):
-    pass
+    def draw(self, surface):
+        # Hull dimensions
+        length = 160
+        height = 40
 
-class Submarine(PolygonGroup, VisualPolygon):
-    components: Vec[Polygon]
+        # Convert physics coords to screen coords
+        x = int(self.s.x) + 400
+        y = int(self.s.z) + 300
 
-    def __init__(self, s: VecXZ, a: VecY, v: VecXZ = VecXZ(.0,.0)): 
+        # Draw an ellipse centered at (x, y)
+        rect = pg.Rect(0, 0, length, height)
+        rect.center = (x, y)
+
+        pg.draw.ellipse(surface, (200, 200, 180), rect)
+
+class Submarine(VisualPolygon, PolygonGroup):
+    def __init__(self, s: VecXZ, a: VecY, v: VecXZ = VecXZ(.0,.0)):
         self.s = s
         self.a = a
         self.v = v
 
-        self.components = Vec(
-            ResistantCylinder(), # hull
-            Propeller(VecXZ(.0,.0), -self.a),
-        )
+        #hull = ResistantCylinder()
+        hull = Hull()
+        prop = Propeller(VecXZ(.0,.0), -self.a)
 
-    @property
-    def hull(self):
-        return self._polys[0]
+        # Explicitly create the list of polygons
+        self._polys = [hull, prop]
 
-    @property
-    def propeller(self):
-        return self._polys[1]
+        self._polys.append(Propeller(VecXZ(0,0), VecY(0)))
 
-    @override
-    def apply_force(self, f: VecXZ):
-        pass
-
-    @override
     def draw(self, surface: pg.Surface):
-        pass
+        # Sync hull position with submarine position
+        #self.hull.s = self.s
 
-    @override
-    def volume(self):
-        return self.hull.volume # TODO add ballast tanks
+        # Draw the hull
+        #self.hull.draw(surface)
+
+        # draw the hull
+        self._polys[0].s = self.s
+        self._polys[0].draw(surface)
+
+        # draw the propeller
+        self._polys[1].draw(surface)
 
 def main():
 
