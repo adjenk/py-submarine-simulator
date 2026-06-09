@@ -50,8 +50,26 @@ class Propeller(Polygon):
 
         return xf, yf, zf
 
-    def draw(self, surface):
-        pg.draw.circle(surface, (255, 0, 0), (int(self.s.x)+400 - 80, int(self.s.z)+300), 5)
+    #def draw(self, surface, pos):
+    #    pg.draw.circle(surface, (255, 0, 0),        # red circle
+    #        (int(pos.x) + 400 - 80, int(pos.z) + 300),
+    #        5
+    #    )
+
+    def draw(self, surface, pos, angle):
+        ox = -80
+        oz = 0
+
+        rx = ox * math.cos(angle) - oz * math.sin(angle)
+        rz = ox * math.sin(angle) + oz * math.cos(angle)
+
+        pg.draw.circle(
+            surface,
+            (255, 0, 0),
+            (int(pos.x + rx) + 400, int(pos.z + rz) + 300),
+            5
+        )
+
 
 class Hull(ResistantCylinder, VisualPolygon):
     def draw(self, surface, pos, angle):
@@ -101,10 +119,11 @@ class Submarine(VisualPolygon, PolygonGroup):
 
         # draw other parts (propeller, periscope, etc.)
         for poly in self._polys[1:]:
-            poly.draw(surface)
+            poly.draw(surface, self.s, self.a.y)
 
     def tick(self, dt: float = 1/60):
         speed = 40
+        drag = 0.98
 
         # compute velocity
         # update position using existing velocity
@@ -118,6 +137,9 @@ class Submarine(VisualPolygon, PolygonGroup):
             self.s.x + self.v.x * dt,
             self.s.z + self.v.z * dt
         )
+
+        self.v = VecXZ(self.v.x * 0.98, self.v.z * 0.98)
+
 
     def rotate(self, da: float):
         self.a = VecY(self.a.y + da)
