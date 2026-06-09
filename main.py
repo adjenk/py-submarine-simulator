@@ -54,21 +54,31 @@ class Propeller(Polygon):
         pg.draw.circle(surface, (255, 0, 0), (int(self.s.x)+400 - 80, int(self.s.z)+300), 5)
 
 class Hull(ResistantCylinder, VisualPolygon):
-    def draw(self, surface):
-        # Hull dimensions
+    def draw(self, surface, pos, angle):
         length = 160
         height = 40
 
         # Convert physics coords to screen coords
-        x = int(self.s.x) + 400
-        y = int(self.s.z) + 300
+        x = int(pos.x) + 400
+        y = int(pos.z) + 300
 
-        # Draw an ellipse centered at (x, y)
-        rect = pg.Rect(0, 0, length, height)
-        rect.center = (x, y)
+        # 1. Create a temporary surface for the hull
+        image = pg.Surface((length, height), pg.SRCALPHA)
 
-        pg.draw.ellipse(surface, (200, 200, 180), rect)
+        # 2. Draw the ellipse onto that surface
+        pg.draw.ellipse(image, (200, 200, 180), image.get_rect())
 
+        # 3. Rotate the surface by the submarine's angle
+        angle_degrees = -math.degrees(angle)
+        rotated = pg.transform.rotate(image, angle_degrees)
+
+        # 4. Center the rotated hull at (x, y)
+        rect = rotated.get_rect(center=(x, y))
+
+        # 5. Blit to the main surface
+        surface.blit(rotated, rect)
+
+    
 class Submarine(VisualPolygon, PolygonGroup):
     def __init__(self, s: VecXZ, a: VecY, v: VecXZ = VecXZ(.0,.0)):
         self.s = s
@@ -84,19 +94,34 @@ class Submarine(VisualPolygon, PolygonGroup):
 
         self._polys.append(Propeller(VecXZ(0,0), VecY(0)))
 
-    def draw(self, surface: pg.Surface):
-        # Sync hull position with submarine position
-        #self.hull.s = self.s
-
-        # Draw the hull
-        #self.hull.draw(surface)
+    def draw(self, surface):
 
         # draw the hull
-        self._polys[0].s = self.s
-        self._polys[0].draw(surface)
+        self._polys[0].draw(surface, self.s, self.a.y)
 
-        # draw the propeller
-        self._polys[1].draw(surface)
+        # draw other parts (propeller, periscope, etc.)
+        for poly in self._polys[1:]:
+            poly.draw(surface)
+
+    def tick(self, dt: float = 1/60):
+        speed = 40
+
+        # compute velocity
+        # update position using existing velocity
+        self.s = VecXZ(
+            self.s.x + self.v.x * dt,
+            self.s.z + self.v.z * dt
+        )
+
+        # update position (VecXZ is immutable → create new one)
+        self.s = VecXZ(
+            self.s.x + self.v.x * dt,
+            self.s.z + self.v.z * dt
+        )
+
+    def rotate(self, da: float):
+        self.a = VecY(self.a.y + da)
+
 
 def main():
 
@@ -115,24 +140,33 @@ def main():
             if event.type == pg.QUIT:
                 break
 
+        dt = clock.get_time() / 1000.0
+
         keys = pg.key.get_pressed()
         if keys[pg.K_LEFT]:
-            pass
+            submarine.rotate(-0.05)
         if keys[pg.K_RIGHT]:
-            pass
+            submarine.rotate(0.05)
         if keys[pg.K_UP]:
-            pass
+            thrust = 20
+            submarine.v = VecXZ(
+                submarine.v.x + math.cos(submarine.a.y) * thrust * dt,
+                submarine.v.z + math.sin(submarine.a.y) * thrust * dt
+            )
+
         if keys[pg.K_DOWN]:
             pass
         if keys[pg.K_q]:
             break
+
+        submarine.tick()
 
         # the background sky and water
         screen.fill(cfg['screen']['color'])
         pg.draw.rect(screen, (0, 0, 255), (0, 100, 800, 500))
 
         submarine.draw(screen)
-
+        
         pg.display.flip()
         clock.tick(60)
 
