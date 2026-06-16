@@ -96,6 +96,26 @@ class Hull(ResistantCylinder, VisualPolygon):
         # 5. Blit to the main surface
         surface.blit(rotated, rect)
 
+class ConningTower(Polygon):
+    def __init__(self, s, a):
+        self.s = s
+        self.a = a
+        self.points = [
+            VecXZ(-10, -45),
+            VecXZ( 10, -45),
+            VecXZ( 10, -15),
+            VecXZ(-10, -15)
+        ]
+
+    def draw(self, surface, pos, angle):
+        pts = []
+        for p in self.points:
+            rx = p.x * math.cos(angle) - p.z * math.sin(angle)
+            rz = p.x * math.sin(angle) + p.z * math.cos(angle)
+            pts.append((int(pos.x + rx) + 400, int(pos.z + rz) + 300))
+
+        pg.draw.polygon(surface, (180,180,160), pts)
+
     
 class Submarine(VisualPolygon, PolygonGroup):
     def __init__(self, s: VecXZ, a: VecY, v: VecXZ = VecXZ(.0,.0)):
@@ -111,6 +131,8 @@ class Submarine(VisualPolygon, PolygonGroup):
         self._polys = [hull, prop]
 
         self._polys.append(Propeller(VecXZ(0,0), VecY(0)))
+
+        self._polys.append(ConningTower(self.s, self.a))
 
     def draw(self, surface):
 
