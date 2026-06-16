@@ -9,19 +9,6 @@ from resistance import ResistantCylinder
 from buoyancy import BuoyantPolygon
 import pygame as pg
 
-def hex_to_tuple(h: int) -> tuple[int,...]:
-    l = []
-    mask = 0xFF
-    for i in range(int(math.log(h)/math.log(0xFF))+1):
-        print(i, mask, h, h & mask)
-        l = [(h & mask) >> i*8] + l
-        mask <<= 8
-    return tuple(l)
-
-
-assert (r := hex_to_tuple(0x12)) == (18,), r
-assert (r := hex_to_tuple(0x1234)) == (18,52), r
-assert (r := hex_to_tuple(0x123456)) == (18,52,86), r
 
 class VisualPolygon(SizePolygon, abc.ABC):
     @abc.abstractmethod
@@ -49,12 +36,6 @@ class Propeller(Polygon):
         zf = -f*cos(za)*sin(ya)
 
         return xf, yf, zf
-
-    #def draw(self, surface, pos):
-    #    pg.draw.circle(surface, (255, 0, 0),        # red circle
-    #        (int(pos.x) + 400 - 80, int(pos.z) + 300),
-    #        5
-    #    )
 
     def draw(self, surface, pos, angle):
         ox = -80
@@ -144,17 +125,9 @@ class Submarine(VisualPolygon, PolygonGroup):
             poly.draw(surface, self.s, self.a.y)
 
     def tick(self, dt: float = 1/60):
-        speed = 40
-        drag = 0.98
 
         # compute velocity
         # update position using existing velocity
-        self.s = VecXZ(
-            self.s.x + self.v.x * dt,
-            self.s.z + self.v.z * dt
-        )
-
-        # update position (VecXZ is immutable → create new one)
         self.s = VecXZ(
             self.s.x + self.v.x * dt,
             self.s.z + self.v.z * dt
