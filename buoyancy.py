@@ -6,7 +6,6 @@ from vec import VecXZ, VecY, VecX
 from polytope import SizePolygon
 
 class BuoyantPolygon(SizePolygon):
-    @abc.abstractmethod 
     def apply_buoyant_force(self, p: float, g: Union[VecXZ,float]):
         if isinstance(g, (int, float)):
             g = VecXZ(.0, g)

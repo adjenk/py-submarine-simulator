@@ -29,12 +29,15 @@ class Vec[T]:
         return iter(self.components)
 
     def _expand_other(self, other: Union[Vec[T],T]) -> Vec[T]:
-        if isinstance(other, Vec[T]):
+        if isinstance(other, Vec):
             return other
         elif isinstance(other, Sequence):
             return Vec(other)
         else:
             return Vec([other]*len(self.components))
+
+    def __rmul__(self, other) -> Vec:
+        return self.__mul__(other)
 
     @staticmethod
     def _make_expanded_other(f: Callable) -> Callable:
@@ -79,12 +82,17 @@ class Vec[T]:
     def __mul__(self, other: Vec) -> float:
         return sum(self._fmap2(operator.mul)(self)(other).components)
 
+    @_make_expanded_other
+    def __truediv__(self, other: Vec) -> Vec:
+        return self._fmap2(operator.truediv)(self)(other)
+
     def __pow__(self, p: int) -> float:
         return sum(self._fmap(lambda x: x**p)(self).components)
 
     @_make_expanded_other
     def __iadd__(self, other: Vec):
-        self.components = self.__add__(other).components
+        # preserve subclass type by updating components in place
+        self.components = list(self._fmap2(operator.add)(self)(other).components)
         return self
 
 class VecXZ[T](Vec[T]):

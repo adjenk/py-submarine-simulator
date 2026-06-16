@@ -25,17 +25,10 @@ class Propeller(Polygon):
         self.s = s
         self.a = a
 
-    def force(self, xa0, ya0, za0, f) -> tuple[float,float,float]:
-        xa = xa0 + self.xa
-        ya = ya0 + self.ya
-        za = za0 + self.za
-
-        # flip the direction to get forward force
-        xf = -f*cos(za)*cos(ya)
-        yf = -f*sin(za)
-        zf = -f*cos(za)*sin(ya)
-
-        return xf, yf, zf
+    def force(self, f, angle) -> VecXZ:
+        xf = f*math.cos(angle)
+        zf = f*math.sin(angle)
+        return VecXZ(xf, zf)
 
     def draw(self, surface, pos, angle):
         ox = -80
@@ -98,25 +91,29 @@ class ConningTower(Polygon):
         pg.draw.polygon(surface, (180,180,160), pts)
 
     
-class Submarine(VisualPolygon, PolygonGroup):
+class Submarine(BuoyantPolygon, VisualPolygon, PolygonGroup):
+    mass = 50000.0  # kg
+    volume = math.pi * 80 * 20
+    moment_of_inertia = 0.25 * 50000 * (80**2 + 20**2)  # for an ellipse
+
     def __init__(self, s: VecXZ, a: VecY, v: VecXZ = VecXZ(.0,.0)):
         self.s = s
         self.a = a
         self.v = v
+        self.omega = 0.0  # angular velocity (radians/sec)
 
-        #hull = ResistantCylinder()
         hull = Hull()
         prop = Propeller(VecXZ(.0,.0), -self.a)
 
         # Explicitly create the list of polygons
         self._polys = [hull, prop]
 
-        self._polys.append(Propeller(VecXZ(0,0), VecY(0)))
-
         self._polys.append(ConningTower(self.s, self.a))
 
-    def draw(self, surface):
+    def apply_torque(self, t: float):
+        self.omega += t / self.moment_of_inertia
 
+    def draw(self, surface):
         # draw the hull
         self._polys[0].draw(surface, self.s, self.a.y)
 
@@ -125,16 +122,34 @@ class Submarine(VisualPolygon, PolygonGroup):
             poly.draw(surface, self.s, self.a.y)
 
     def tick(self, dt: float = 1/60):
+        # apply drag force: F_d = 0.5 * cd * p * A * v^2
+        cd = 0.04  # drag coefficient for a streamlined hull
+        p = 1.0    # fluid density (pixel units)
+        A = 40     # projected frontal area (hull height in pixels)
+        drag_x = -0.5 * cd * p * A * self.v.x * abs(self.v.x)
+        drag_z = -0.5 * cd * p * A * self.v.z * abs(self.v.z)
+        self.apply_force(VecXZ(drag_x, drag_z))
 
-        # compute velocity
-        # update position using existing velocity
+        # update position from velocity
         self.s = VecXZ(
             self.s.x + self.v.x * dt,
             self.s.z + self.v.z * dt
         )
 
-        self.v = VecXZ(self.v.x * 0.98, self.v.z * 0.98)
+         # update angle from angular velocity
+        self.a = VecY(self.a.y + self.omega * dt)
 
+        # apply angular drag
+        self.omega *= 0.90
+
+        # wrap around screen bounds (origin is screen centre)
+        self.s = VecXZ(
+            (self.s.x + 400) % 800 - 400,
+            (self.s.z + 300) % 600 - 300
+        )
+
+        # apply drag (horizontal only)
+        self.v = VecXZ(self.v.x * 0.98, 0.0)
 
     def rotate(self, da: float):
         self.a = VecY(self.a.y + da)
@@ -161,21 +176,22 @@ def main():
 
         keys = pg.key.get_pressed()
         if keys[pg.K_LEFT]:
-            submarine.rotate(-0.05)
+            submarine.apply_torque(-3000000)
         if keys[pg.K_RIGHT]:
-            submarine.rotate(0.05)
+            submarine.apply_torque(3000000)
         if keys[pg.K_UP]:
-            thrust = 20
-            submarine.v = VecXZ(
-                submarine.v.x + math.cos(submarine.a.y) * thrust * dt,
-                submarine.v.z + math.sin(submarine.a.y) * thrust * dt
-            )
-
+            thrust = 500000
+            submarine.apply_force(submarine._polys[1].force(thrust, submarine.a.y))
         if keys[pg.K_DOWN]:
-            pass
+            thrust = 500000
+            submarine.apply_force(submarine._polys[1].force(-thrust, submarine.a.y))
         if keys[pg.K_q]:
             break
 
+#        submarine.apply_buoyant_force(1.0, VecXZ(0, -0.5))
+#        submarine.apply_force(VecXZ(0, math.pi * 80 * 20 * 0.5))  # match buoyancy exactly
+
+        # print(f"v={submarine.v.x:.3f},{submarine.v.z:.3f} s={submarine.s.x:.3f},{submarine.s.z:.3f} a={submarine.a.y:.3f} omega={submarine.omega:.3f}")
         submarine.tick()
 
         # the background sky and water

@@ -1,12 +1,14 @@
 # 2D Submarine Simulator
 
+## Features
+- Working physics loop
+- Propeller linear thrust
+- Rigid body linear drag
+- Rotational physics
+
 ## Todo
-- Working physics loop: Submarine has mass, forces are applied each tick, velocity and position update from those forces
 - Flat buoyancy (Archimedes principle)
-- Propeller linear thrust via physics loop
-- Rigid body linear friction / drag using water pressure
 - Gradient water pressure buoyancy as extension of flat buoyancy
-- Propeller torque and wing steering (requires rotational physics: moment of inertia, angular velocity)
 
 ## Stretch Goals
 - Curved surface friction adjustment (aerodynamic nose cone drag dampening)
