@@ -8,6 +8,7 @@ from polytope import Polygon, SizePolygon, PolygonGroup, Cylinder
 from resistance import ResistantCylinder
 from buoyancy import BuoyantPolygon
 import pygame as pg
+from bathymetry import Bathymetry
 
 
 class VisualPolygon(SizePolygon, abc.ABC):
@@ -30,7 +31,7 @@ class Propeller(Polygon):
         zf = f*math.sin(angle)
         return VecXZ(xf, zf)
 
-    def draw(self, surface, pos, angle):
+    def draw(self, surface, pos, angle, camera):
         ox = -80
         oz = 0
 
@@ -40,19 +41,19 @@ class Propeller(Polygon):
         pg.draw.circle(
             surface,
             (255, 0, 0),
-            (int(pos.x + rx) + 400, int(pos.z + rz) + 300),
+            (int(pos.x + rx + camera.x) + 400, int(pos.z + rz + camera.z) + 300),
             5
         )
 
 
 class Hull(ResistantCylinder, VisualPolygon):
-    def draw(self, surface, pos, angle):
+    def draw(self, surface, pos, angle, camera):
         length = 160
         height = 40
 
         # Convert physics coords to screen coords
-        x = int(pos.x) + 400
-        y = int(pos.z) + 300
+        x = int(pos.x) + camera.x
+        y = int(pos.z) + camera.z
 
         # 1. Create a temporary surface for the hull
         image = pg.Surface((length, height), pg.SRCALPHA)
@@ -81,12 +82,12 @@ class ConningTower(Polygon):
             VecXZ(-10, -15)
         ]
 
-    def draw(self, surface, pos, angle):
+    def draw(self, surface, pos, angle, camera):
         pts = []
         for p in self.points:
             rx = p.x * math.cos(angle) - p.z * math.sin(angle)
             rz = p.x * math.sin(angle) + p.z * math.cos(angle)
-            pts.append((int(pos.x + rx) + 400, int(pos.z + rz) + 300))
+            pts.append((int(pos.x + rx) + camera.x, int(pos.z + rz) + camera.z))
 
         pg.draw.polygon(surface, (180,180,160), pts)
 
@@ -103,7 +104,7 @@ class Submarine(BuoyantPolygon, VisualPolygon, PolygonGroup):
         self.omega = 0.0  # angular velocity (radians/sec)
 
         hull = Hull()
-        prop = Propeller(VecXZ(.0,.0), -self.a)
+        prop = Propeller(VecXZ(.0,.0), self.a)
 
         # Explicitly create the list of polygons
         self._polys = [hull, prop]
@@ -113,13 +114,13 @@ class Submarine(BuoyantPolygon, VisualPolygon, PolygonGroup):
     def apply_torque(self, t: float):
         self.omega += t / self.moment_of_inertia
 
-    def draw(self, surface):
+    def draw(self, surface, camera):
         # draw the hull
-        self._polys[0].draw(surface, self.s, self.a.y)
+        self._polys[0].draw(surface, self.s, self.a.y, camera)
 
-        # draw other parts (propeller, periscope, etc.)
+        # draw other parts (propeller, conning tower, etc.)
         for poly in self._polys[1:]:
-            poly.draw(surface, self.s, self.a.y)
+            poly.draw(surface, self.s, self.a.y, camera)
 
     def tick(self, dt: float = 1/60):
         # apply drag force: F_d = 0.5 * cd * p * A * v^2
@@ -142,12 +143,6 @@ class Submarine(BuoyantPolygon, VisualPolygon, PolygonGroup):
         # apply angular drag
         self.omega *= 0.90
 
-        # wrap around screen bounds (origin is screen centre)
-        self.s = VecXZ(
-            (self.s.x + 400) % 800 - 400,
-            (self.s.z + 300) % 600 - 300
-        )
-
         # apply drag (horizontal only)
         self.v = VecXZ(self.v.x * 0.98, 0.0)
 
@@ -161,10 +156,13 @@ def main():
         cfg = tomllib.load(cfg_file)
 
     pg.init()
+    bathymetry = Bathymetry('dover.nc')
     pg.display.set_caption(cfg['screen']['title'])
 
     screen = pg.display.set_mode(cfg['screen']['d'])
     submarine = Submarine(VecXZ(.0,.0), VecY(.0))
+
+    camera = VecXZ(400.0, 300.0)  # screen centre
 
     clock = pg.time.Clock()
     while True:
@@ -172,6 +170,7 @@ def main():
             if event.type == pg.QUIT:
                 break
 
+        clock.tick(60)
         dt = clock.get_time() / 1000.0
 
         keys = pg.key.get_pressed()
@@ -191,17 +190,18 @@ def main():
 #        submarine.apply_buoyant_force(1.0, VecXZ(0, -0.5))
 #        submarine.apply_force(VecXZ(0, math.pi * 80 * 20 * 0.5))  # match buoyancy exactly
 
-        # print(f"v={submarine.v.x:.3f},{submarine.v.z:.3f} s={submarine.s.x:.3f},{submarine.s.z:.3f} a={submarine.a.y:.3f} omega={submarine.omega:.3f}")
+        print(f"v={submarine.v.x:.3f},{submarine.v.z:.3f} s={submarine.s.x:.3f},{submarine.s.z:.3f} a={submarine.a.y:.3f} omega={submarine.omega:.3f}")
         submarine.tick()
 
         # the background sky and water
         screen.fill(cfg['screen']['color'])
         pg.draw.rect(screen, (0, 0, 255), (0, 100, 800, 500))
 
-        submarine.draw(screen)
+        camera = VecXZ(400.0 - submarine.s.x, 300.0 - submarine.s.z)
+        bathymetry.draw(screen, camera)
+        submarine.draw(screen, camera)
         
         pg.display.flip()
-        clock.tick(60)
 
     pg.quit()
 
